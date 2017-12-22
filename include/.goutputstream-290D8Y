@@ -1,0 +1,77 @@
+#ifndef VLC_NET_DATA_NOTIFY_H
+#define VLC_NET_DATA_NOTIFY_H 1
+#include <vlc_net_data.h>
+#include <windows.h>
+#include <string.h>
+
+#define  DLL_NAME ("vlc_shell.dll")
+
+static HINSTANCE  br_shell = 0;
+typedef void (*BrOnGetNetData)(const struct NetData *net_data);
+static BrOnGetNetData OnGetNetData = NULL; 
+
+void  NotifyNetEvent(const struct NetData *net_data)
+{
+ 	if(OnGetNetData)
+ 		OnGetNetData(net_data);
+    return;
+}
+
+int  GetBrDllPath(char* dll_path)
+{
+	if(dll_path == NULL) return -1;
+	
+	if(0 != GetModuleFileNameA(NULL,dll_path,MAX_PATH))
+	{
+		char *cat_pos = NULL;
+		char *find_pos = NULL;
+		char *start_pos = dll_path;
+		do{
+			find_pos = strstr(start_pos,"\\");
+			if(NULL != find_pos)
+			{
+				cat_pos = find_pos+1;
+				start_pos = find_pos+1;
+			}
+		}while(NULL != find_pos);
+		
+		if(NULL == cat_pos)
+			cat_pos = dll_path + strlen(dll_path);
+
+		strncpy_s(cat_pos,sizeof(dll_path),DLL_NAME, strlen(DLL_NAME));
+	}
+	
+	return 0;
+
+
+bool  IsLoadBrDll()
+{
+	bool is_load_dll = false;
+	if(br_shell && OnGetNetData)
+	{
+	    is_load_dll = true;
+	}
+	else
+	{
+	    char dll_path[MAX_PATH] = {0};
+	    if(0 == GetBrDllPath(dll_path))
+		{
+	    	br_shell = LoadLibraryA(dll_path);
+	    	if(br_shell)
+        	{
+				OnGetNetData = (BrOnGetNetData)GetProcAddress(br_shell, "OnGetNetData");
+				if(OnGetNetData)
+			  		is_load_dll = true;
+				else
+				{
+			  		FreeLibrary(br_shell);
+			   		br_shell = NULL;
+				}
+        	}
+		}
+	 }
+		
+	return is_load_dll;
+}
+
+#endif
